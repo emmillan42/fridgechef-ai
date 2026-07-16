@@ -22,7 +22,7 @@ if "resultado_recetas" not in st.session_state:
 def get_gemini_client():
     # --- OPCIÓN A: Autenticación mediante Service Account (JSON de Google Cloud) ---
     # Buscamos si existe la configuración de la cuenta de servicio en los Secrets de Streamlit
-    """ if "gcp_service_account" in st.secrets:
+    if "gcp_service_account" in st.secrets:
         try:
             # Cargamos las credenciales desde el diccionario de secretos
             info = dict(st.secrets["gcp_service_account"])
@@ -40,7 +40,7 @@ def get_gemini_client():
                 credentials=credentials
             )
         except Exception as e:
-            st.warning(f"Se detectó configuración de Service Account pero falló la carga: {e}. """ Intentando con API Key...")
+            st.warning(f"Se detectó configuración de Service Account pero falló la carga: {e}. Intentando con API Key...")
 
     # --- OPCIÓN B: Autenticación mediante API Key ---
     # 1. Intentamos leer la API Key desde los Secrets de Streamlit (Entorno Cloud)
