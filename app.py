@@ -46,7 +46,7 @@ if foto_nevera is not None:
                 Ejemplo de salida: tomate, queso, leche, pollo, lechuga
                 """
                 response_vision = client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model='gemini-3.1-flash-lite',
                     contents=[imagen, prompt_vision]
                 )
                 # Guardamos directamente en el estado de sesión del widget de texto
@@ -111,7 +111,7 @@ if st.button("Buscar Recetas 🚀", use_container_width=True):
 
             Restricciones a respetar estrictamente:
             - Dieta: {dieta}
-            - Alergias/Exclusiones: {alergias if allergies else 'Ninguna'}
+            - Alergias/Exclusiones: {alergias if alergias else 'Ninguna'}
             - Tiempo máximo: {tiempo_max} minutos.
 
             Genera exactamente 3 recetas viables y realistas.
@@ -121,7 +121,7 @@ if st.button("Buscar Recetas 🚀", use_container_width=True):
 
             try:
                 response = client.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model='gemini-3.1-flash-lite',
                     contents=prompt_base,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
