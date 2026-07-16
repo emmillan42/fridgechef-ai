@@ -1,0 +1,15 @@
+{
+  "recetas": [
+    {
+      "nombre": "Nombre del plato propuesto",
+      "tiempo_min": 25,
+      "ingredientes_usados": ["ingrediente1", "ingrediente2"],
+      "faltantes_opcionales": ["ingrediente_opcional"],
+      "pasos": [
+        "Paso 1: Descripción de la acción.",
+        "Paso 2: Descripción de la acción."
+      ],
+      "consejo_antidesperdicio": "Explicación de conservación o prioridad de consumo."
+    }
+  ]
+}
