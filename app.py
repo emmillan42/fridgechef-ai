@@ -40,7 +40,6 @@ def get_gemini_client():
             print("INFO: Autenticado con éxito usando Google Cloud Service Account (Vertex AI).")
             return client
         except Exception as e:
-            # Si falla la Service Account por permisos, formato, etc., imprimimos el error en consola
             print(f"WARNING: Falló la autenticación por Service Account: {e}. Intentando fallback a API Key...")
 
     # --- PASO 2: Comprobar e intentar API Key desde Secrets de Streamlit (Prioridad 2) ---
@@ -49,25 +48,6 @@ def get_gemini_client():
         return genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
     # --- PASO 3: Intentar API Key desde variable de entorno local (WSL/Ubuntu) ---
-    import os
-    if "GEMINI_API_KEY" in os.environ:
-        print("INFO: Autenticado con éxito usando GEMINI_API_KEY desde variables de entorno locales.")
-        return genai.Client()
-
-    # --- PASO 4: Error si no encuentra absolutamente nada ---
-    raise ValueError(
-        "No se detectaron credenciales válidas. Configura 'gcp_service_account' o 'GEMINI_API_KEY' "
-        "en tus secrets de Streamlit o variables de entorno."
-    )
-
-try:
-    client = get_gemini_client()
-except Exception as e:
-    st.error(f"Error crítico de autenticación: {e}")
-    st.stop()
-
-    # --- PASO 3: Intentar API Key desde variable de entorno local (WSL/Ubuntu) ---
-    import os
     if "GEMINI_API_KEY" in os.environ:
         print("INFO: Autenticado con éxito usando GEMINI_API_KEY desde variables de entorno locales.")
         return genai.Client()
