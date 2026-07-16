@@ -9,40 +9,28 @@ st.set_page_config(page_title="FridgeChef AI", page_icon="🍳", layout="centere
 st.title("🍳 FridgeChef AI")
 st.write("¡Transforma tu nevera en deliciosas recetas y reduce el desperdicio!")
 
-""" # 2. Inicialización del cliente de Gemini
+# --- INICIALIZACIÓN DEL ESTADO DE SESIÓN (Persistencia de datos) ---
+if "ingredientes_text" not in st.session_state:
+    st.session_state["ingredientes_text"] = ""
+if "resultado_recetas" not in st.session_state:
+    st.session_state["resultado_recetas"] = None
+
+# 2. Inicialización segura del cliente de Gemini
 @st.cache_resource
 def get_gemini_client():
+    if "GEMINI_API_KEY" in st.secrets:
+        return genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
     return genai.Client()
 
 try:
     client = get_gemini_client()
 except Exception as e:
     st.error("Error al conectar con Gemini. Verifica que tu variable GEMINI_API_KEY esté configurada.")
-    st.stop() """
-
-# 2. Inicialización del cliente de Gemini de forma segura
-@st.cache_resource
-def get_gemini_client():
-    # 1. Intenta leer desde los "Secrets" de Streamlit (Entorno Cloud)
-    if "GEMINI_API_KEY" in st.secrets:
-        return genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-
-    # 2. Si no existe en secrets, usa el comportamiento local por defecto
-    # (El SDK de google-genai buscará automáticamente la variable de entorno local)
-    return genai.Client()
-
-try:
-    client = get_gemini_client()
-except Exception as e:
-    st.error("Error al conectar con Gemini. Asegúrate de configurar tu API Key en la barra lateral o en los Secrets.")
     st.stop()
 
-# 3. Extensión opcional: Visión AI para escanear la nevera
+# 3. Extensión: Visión AI para escanear la nevera
 st.subheader("📸 Escanea tu Nevera con Visión AI")
 foto_nevera = st.file_uploader("Sube una foto de tu nevera o despensa", type=["jpg", "jpeg", "png"])
-
-if "ingredientes_detectados" not in st.session_state:
-    st.session_state["ingredientes_detectados"] = ""
 
 if foto_nevera is not None:
     try:
@@ -58,10 +46,11 @@ if foto_nevera is not None:
                 Ejemplo de salida: tomate, queso, leche, pollo, lechuga
                 """
                 response_vision = client.models.generate_content(
-                    model='gemini-3.1-flash-lite',
+                    model='gemini-2.5-flash',
                     contents=[imagen, prompt_vision]
                 )
-                st.session_state["ingredientes_detectados"] = response_vision.text.strip()
+                # Guardamos directamente en el estado de sesión del widget de texto
+                st.session_state["ingredientes_text"] = response_vision.text.strip()
                 st.success("¡Ingredientes detectados con éxito!")
     except Exception as e:
         st.error(f"Error al procesar la imagen: {e}")
@@ -72,10 +61,18 @@ dieta = st.sidebar.selectbox("Tipo de dieta", ["Ninguna", "Vegetariana", "Vegana
 alergias = st.sidebar.text_input("Alergias o exclusiones (ej. maní, lactosa)", "")
 tiempo_max = st.sidebar.slider("Tiempo máximo de preparación (minutos)", 10, 120, 30)
 
+# BOTÓN DE RESET / LIMPIAR TODO
+st.sidebar.markdown("---")
+if st.sidebar.button("🧹 Limpiar Cocina (Empezar de nuevo)", use_container_width=True):
+    st.session_state["ingredientes_text"] = ""
+    st.session_state["resultado_recetas"] = None
+    st.rerun()
+
 st.subheader("📋 ¿Qué tienes en la nevera?")
+# Vinculamos la caja de texto directamente al Session State mediante la propiedad 'key'
 ingredientes_input = st.text_area(
     "Ingredientes disponibles (puedes editarlos o añadir más):",
-    value=st.session_state["ingredientes_detectados"],
+    key="ingredientes_text",
     placeholder="huevos, arroz, tomate, calabacín, cebolla"
 )
 
@@ -102,7 +99,7 @@ esquema_recetas = types.Schema(
     required=["recetas"]
 )
 
-# 6. Botón de acción para generar recetas
+# 6. Botón de acción para generar recetas (Solo realiza la llamada a la API)
 if st.button("Buscar Recetas 🚀", use_container_width=True):
     if not ingredientes_input.strip():
         st.warning("Por favor, introduce o detecta al menos un ingrediente.")
@@ -114,7 +111,7 @@ if st.button("Buscar Recetas 🚀", use_container_width=True):
 
             Restricciones a respetar estrictamente:
             - Dieta: {dieta}
-            - Alergias/Exclusiones: {alergias if alergias else 'Ninguna'}
+            - Alergias/Exclusiones: {alergias if allergies else 'Ninguna'}
             - Tiempo máximo: {tiempo_max} minutos.
 
             Genera exactamente 3 recetas viables y realistas.
@@ -124,7 +121,7 @@ if st.button("Buscar Recetas 🚀", use_container_width=True):
 
             try:
                 response = client.models.generate_content(
-                    model='gemini-3.1-flash-lite',
+                    model='gemini-2.5-flash',
                     contents=prompt_base,
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
@@ -133,48 +130,51 @@ if st.button("Buscar Recetas 🚀", use_container_width=True):
                     ),
                 )
 
-                resultado = json.loads(response.text)
-                st.success("¡Aquí tienes tus opciones personalizadas!")
-
-                # --- NUEVA FUNCIONALIDAD: DESCARGA Y VISUALIZACIÓN DE JSON ---
-                # Convertimos el diccionario 'resultado' a un string JSON formateado bonito
-                json_string = json.dumps(resultado, indent=2, ensure_ascii=False)
-
-                col_download, col_empty = st.columns([1, 2])
-                with col_download:
-                    st.download_button(
-                        label="📥 Descargar JSON",
-                        data=json_string,
-                        file_name="recetas_fridgechef.json",
-                        mime="application/json",
-                        use_container_width=True
-                    )
-
-                # Desplegable para ver y copiar el JSON directamente
-                with st.expander("👾 Ver JSON de salida (Código fuente)"):
-                    st.json(resultado)
-                # -------------------------------------------------------------
-
-                for idx, receta in enumerate(resultado["recetas"]):
-                    with st.expander(f"🍽️ {receta['nombre']} — ⏱️ {receta['tiempo_min']} mins", expanded=True if idx==0 else False):
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.write("**Ingredientes que usarás:**")
-                            for ing in receta["ingredientes_usados"]:
-                                st.write(f"- {ing}")
-                        with col2:
-                            if receta["faltantes_opcionales"]:
-                                st.write("**Faltantes recomendados:**")
-                                for falt in receta["faltantes_opcionales"]:
-                                    st.write(f"- 🛒 {falt}")
-                            else:
-                                st.write("**¡Tienes todo lo necesario! 🎉**")
-
-                        st.write("**Pasos de preparación:**")
-                        for i, paso in enumerate(receta["pasos"], 1):
-                            st.write(f"{i}. {paso}")
-
-                        st.info(f"💡 **Consejo Anti-Desperdicio:** {receta['consejo_antidesperdicio']}")
+                # Guardamos el resultado en la sesión persistente en lugar de una variable local
+                st.session_state["resultado_recetas"] = json.loads(response.text)
 
             except Exception as e:
                 st.error(f"Ocurrió un error al procesar tu solicitud: {e}")
+
+# 7. Renderizado de los resultados (Independiente del botón, persistente al 'rerun')
+if st.session_state["resultado_recetas"] is not None:
+    resultado = st.session_state["resultado_recetas"]
+    st.success("¡Aquí tienes tus opciones personalizadas!")
+
+    # Bloque de descarga y visualización de JSON
+    json_string = json.dumps(resultado, indent=2, ensure_ascii=False)
+
+    col_download, col_empty = st.columns([1, 2])
+    with col_download:
+        st.download_button(
+            label="📥 Descargar JSON",
+            data=json_string,
+            file_name="recetas_fridgechef.json",
+            mime="application/json",
+            use_container_width=True
+        )
+
+    with st.expander("👾 Ver JSON de salida (Código fuente)"):
+        st.json(resultado)
+
+    # Dibujar las recetas en la pantalla
+    for idx, receta in enumerate(resultado["recetas"]):
+        with st.expander(f"🍽️ {receta['nombre']} — ⏱️ {receta['tiempo_min']} mins", expanded=True if idx == 0 else False):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("**Ingredientes que usarás:**")
+                for ing in receta["ingredientes_usados"]:
+                    st.write(f"- {ing}")
+            with col2:
+                if receta["faltantes_opcionales"]:
+                    st.write("**Faltantes recomendados:**")
+                    for falt in receta["faltantes_opcionales"]:
+                        st.write(f"- 🛒 {falt}")
+                else:
+                    st.write("**¡Tienes todo lo necesario! 🎉**")
+
+            st.write("**Pasos de preparación:**")
+            for i, paso in enumerate(receta["pasos"], 1):
+                st.write(f"{i}. {paso}")
+
+            st.info(f"💡 **Consejo Anti-Desperdicio:** {receta['consejo_antidesperdicio']}")
