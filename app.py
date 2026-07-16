@@ -17,43 +17,71 @@ if "ingredientes_text" not in st.session_state:
 if "resultado_recetas" not in st.session_state:
     st.session_state["resultado_recetas"] = None
 
-# 2. Inicialización del cliente de Gemini (Híbrida: API Key o Service Account)
+# 2. Inicialización del cliente de Gemini con Autodetect y Fallback
 @st.cache_resource
 def get_gemini_client():
-    # --- OPCIÓN A: Autenticación mediante Service Account (JSON de Google Cloud) ---
-    # Buscamos si existe la configuración de la cuenta de servicio en los Secrets de Streamlit
+    # --- PASO 1: Comprobar e intentar Cuenta de Servicio (Prioridad 1) ---
     if "gcp_service_account" in st.secrets:
         try:
-            # Cargamos las credenciales desde el diccionario de secretos
             info = dict(st.secrets["gcp_service_account"])
             credentials = service_account.Credentials.from_service_account_info(info)
 
-            # Obtenemos el ID del proyecto de GCP desde los secretos (Vertex AI lo requiere)
             project_id = st.secrets.get("gcp_project_id", info.get("project_id"))
-            location = st.secrets.get("gcp_location", "us-central1") # Región por defecto
+            location = st.secrets.get("gcp_location", "us-central1")
 
-            # Inicializamos el cliente apuntando a Vertex AI utilizando la Service Account
-            return genai.Client(
+            # Inicializamos cliente apuntando a Vertex AI
+            client = genai.Client(
                 vertexai=True,
                 project=project_id,
                 location=location,
                 credentials=credentials
             )
+            # Log de éxito en la consola de la terminal
+            print("INFO: Autenticado con éxito usando Google Cloud Service Account (Vertex AI).")
+            return client
         except Exception as e:
-            st.warning(f"Se detectó configuración de Service Account pero falló la carga: {e}. Intentando con API Key...")
+            # Si falla la Service Account por permisos, formato, etc., imprimimos el error en consola
+            print(f"WARNING: Falló la autenticación por Service Account: {e}. Intentando fallback a API Key...")
 
-    # --- OPCIÓN B: Autenticación mediante API Key ---
-    # 1. Intentamos leer la API Key desde los Secrets de Streamlit (Entorno Cloud)
+    # --- PASO 2: Comprobar e intentar API Key desde Secrets de Streamlit (Prioridad 2) ---
     if "GEMINI_API_KEY" in st.secrets:
+        print("INFO: Autenticado con éxito usando GEMINI_API_KEY desde Streamlit Secrets.")
         return genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-    # 2. Si no hay secretos, el SDK intentará leer localmente la variable de entorno GEMINI_API_KEY
-    return genai.Client()
+    # --- PASO 3: Intentar API Key desde variable de entorno local (WSL/Ubuntu) ---
+    import os
+    if "GEMINI_API_KEY" in os.environ:
+        print("INFO: Autenticado con éxito usando GEMINI_API_KEY desde variables de entorno locales.")
+        return genai.Client()
+
+    # --- PASO 4: Error si no encuentra absolutamente nada ---
+    raise ValueError(
+        "No se detectaron credenciales válidas. Configura 'gcp_service_account' o 'GEMINI_API_KEY' "
+        "en tus secrets de Streamlit o variables de entorno."
+    )
 
 try:
     client = get_gemini_client()
 except Exception as e:
-    st.error("Error al conectar con Gemini. Asegúrate de configurar tu API Key o tu Service Account en los Secrets.")
+    st.error(f"Error crítico de autenticación: {e}")
+    st.stop()
+
+    # --- PASO 3: Intentar API Key desde variable de entorno local (WSL/Ubuntu) ---
+    import os
+    if "GEMINI_API_KEY" in os.environ:
+        print("INFO: Autenticado con éxito usando GEMINI_API_KEY desde variables de entorno locales.")
+        return genai.Client()
+
+    # --- PASO 4: Error si no encuentra absolutamente nada ---
+    raise ValueError(
+        "No se detectaron credenciales válidas. Configura 'gcp_service_account' o 'GEMINI_API_KEY' "
+        "en tus secrets de Streamlit o variables de entorno."
+    )
+
+try:
+    client = get_gemini_client()
+except Exception as e:
+    st.error(f"Error crítico de autenticación: {e}")
     st.stop()
 
 # 3. Extensión: Visión AI para escanear la nevera
