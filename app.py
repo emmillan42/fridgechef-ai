@@ -3,6 +3,8 @@ import json
 from PIL import Image
 from google import genai
 from google.genai import types
+# Nueva importación para manejar la cuenta de servicio de Google Cloud
+from google.oauth2 import service_account
 
 # 1. Configuración de la página de Streamlit
 st.set_page_config(page_title="FridgeChef AI", page_icon="🍳", layout="centered")
@@ -15,17 +17,43 @@ if "ingredientes_text" not in st.session_state:
 if "resultado_recetas" not in st.session_state:
     st.session_state["resultado_recetas"] = None
 
-# 2. Inicialización segura del cliente de Gemini
+# 2. Inicialización del cliente de Gemini (Híbrida: API Key o Service Account)
 @st.cache_resource
 def get_gemini_client():
+    # --- OPCIÓN A: Autenticación mediante Service Account (JSON de Google Cloud) ---
+    # Buscamos si existe la configuración de la cuenta de servicio en los Secrets de Streamlit
+    """ if "gcp_service_account" in st.secrets:
+        try:
+            # Cargamos las credenciales desde el diccionario de secretos
+            info = dict(st.secrets["gcp_service_account"])
+            credentials = service_account.Credentials.from_service_account_info(info)
+
+            # Obtenemos el ID del proyecto de GCP desde los secretos (Vertex AI lo requiere)
+            project_id = st.secrets.get("gcp_project_id", info.get("project_id"))
+            location = st.secrets.get("gcp_location", "us-central1") # Región por defecto
+
+            # Inicializamos el cliente apuntando a Vertex AI utilizando la Service Account
+            return genai.Client(
+                vertexai=True,
+                project=project_id,
+                location=location,
+                credentials=credentials
+            )
+        except Exception as e:
+            st.warning(f"Se detectó configuración de Service Account pero falló la carga: {e}. """ Intentando con API Key...")
+
+    # --- OPCIÓN B: Autenticación mediante API Key ---
+    # 1. Intentamos leer la API Key desde los Secrets de Streamlit (Entorno Cloud)
     if "GEMINI_API_KEY" in st.secrets:
         return genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+
+    # 2. Si no hay secretos, el SDK intentará leer localmente la variable de entorno GEMINI_API_KEY
     return genai.Client()
 
 try:
     client = get_gemini_client()
 except Exception as e:
-    st.error("Error al conectar con Gemini. Verifica que tu variable GEMINI_API_KEY esté configurada.")
+    st.error("Error al conectar con Gemini. Asegúrate de configurar tu API Key o tu Service Account en los Secrets.")
     st.stop()
 
 # 3. Extensión: Visión AI para escanear la nevera
