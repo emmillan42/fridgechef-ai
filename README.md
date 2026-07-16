@@ -94,5 +94,6 @@ Abre cualquier navegador (Chrome, Edge, Firefox, etc.) e ingresa a la dirección
 ```Plaintext
 Local URL: http://localhost:8501
 Network URL: http://172.xx.xx.xx:8501
+Web App URL: https://fridgechef-ai.streamlit.app/
 ```
 ¡Ahí verás la app de FridgeChef AI completamente funcional en directo!
