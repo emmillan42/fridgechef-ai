@@ -9,7 +9,7 @@ st.set_page_config(page_title="FridgeChef AI", page_icon="🍳", layout="centere
 st.title("🍳 FridgeChef AI")
 st.write("¡Transforma tu nevera en deliciosas recetas y reduce el desperdicio!")
 
-# 2. Inicialización del cliente de Gemini
+""" # 2. Inicialización del cliente de Gemini
 @st.cache_resource
 def get_gemini_client():
     return genai.Client()
@@ -18,6 +18,23 @@ try:
     client = get_gemini_client()
 except Exception as e:
     st.error("Error al conectar con Gemini. Verifica que tu variable GEMINI_API_KEY esté configurada.")
+    st.stop() """
+
+# 2. Inicialización del cliente de Gemini de forma segura
+@st.cache_resource
+def get_gemini_client():
+    # 1. Intenta leer desde los "Secrets" de Streamlit (Entorno Cloud)
+    if "GEMINI_API_KEY" in st.secrets:
+        return genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+
+    # 2. Si no existe en secrets, usa el comportamiento local por defecto
+    # (El SDK de google-genai buscará automáticamente la variable de entorno local)
+    return genai.Client()
+
+try:
+    client = get_gemini_client()
+except Exception as e:
+    st.error("Error al conectar con Gemini. Asegúrate de configurar tu API Key en la barra lateral o en los Secrets.")
     st.stop()
 
 # 3. Extensión opcional: Visión AI para escanear la nevera
