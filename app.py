@@ -16,6 +16,20 @@ if "ingredientes_text" not in st.session_state:
     st.session_state["ingredientes_text"] = ""
 if "resultado_recetas" not in st.session_state:
     st.session_state["resultado_recetas"] = None
+if "obligatorios_text" not in st.session_state:
+    st.session_state["obligatorios_text"] = ""
+if "excluidos_text" not in st.session_state:
+    st.session_state["excluidos_text"] = ""
+
+# BOTÓN DE RESET / LIMPIAR TODO
+if st.sidebar.button("🧹 Limpiar Cocina (Empezar de nuevo)", use_container_width=True):
+    st.session_state["ingredientes_text"] = ""
+    st.session_state["resultado_recetas"] = None
+    st.session_state["obligatorios_text"] = ""
+    st.session_state["excluidos_text"] = ""
+    st.rerun()
+st.sidebar.markdown("---")
+
 
 # 2. Inicialización del cliente de Gemini con Autodetect y Fallback
 @st.cache_resource
@@ -94,15 +108,22 @@ if foto_nevera is not None:
 # 4. Interfaz de Usuario (UI) - Captura de datos
 st.sidebar.header("⚙️ Filtros y Preferencias")
 dieta = st.sidebar.selectbox("Tipo de dieta", ["Ninguna", "Vegetariana", "Vegana", "Keto", "Sin Gluten"])
-alergias = st.sidebar.text_input("Alergias o exclusiones (ej. maní, lactosa)", "")
-tiempo_max = st.sidebar.slider("Tiempo máximo de preparación (minutos)", 10, 120, 30)
+alergias = st.sidebar.text_input("Alergias o exclusiones médicas (ej. maní, lactosa)", "")
 
-# BOTÓN DE RESET / LIMPIAR TODO
-st.sidebar.markdown("---")
-if st.sidebar.button("🧹 Limpiar Cocina (Empezar de nuevo)", use_container_width=True):
-    st.session_state["ingredientes_text"] = ""
-    st.session_state["resultado_recetas"] = None
-    st.rerun()
+# --- NUEVOS FILTROS DE INGREDIENTES ---
+ingredientes_obligatorios = st.sidebar.text_input(
+    "👍 Usar obligatoriamente (ej. calabacín, pollo)",
+    key="obligatorios_text",  # 👈 Añade esta clave
+    help="La IA incluirá estos ingredientes en todas las recetas generadas."
+)
+ingredientes_excluidos = st.sidebar.text_input(
+    "👎 Excluir ingredientes (ej. cebolla, cilantro)",
+    key="excluidos_text",     # 👈 Añade esta clave
+    help="La IA no utilizará estos ingredientes bajo ninguna circunstancia."
+)
+# --------------------------------------
+
+tiempo_max = st.sidebar.slider("Tiempo máximo de preparación (minutos)", 10, 120, 30)
 
 st.subheader("📋 ¿Qué tienes en la nevera?")
 # Vinculamos la caja de texto directamente al Session State mediante la propiedad 'key'
@@ -143,12 +164,16 @@ if st.button("Buscar Recetas 🚀", use_container_width=True):
         with st.spinner("Pensando en las mejores recetas para ti... 🧑‍🍳"):
             prompt_base = f"""
             Eres un asistente experto en cocina práctica (FridgeChef AI).
-            Con los siguientes ingredientes disponibles: {ingredientes_input}.
+            Con los siguientes ingredientes disponibles en la nevera: {ingredientes_input}.
 
-            Restricciones a respetar estrictamente:
+            Restricciones y reglas a respetar estrictamente:
             - Dieta: {dieta}
-            - Alergias/Exclusiones: {alergias if alergias else 'Ninguna'}
-            - Tiempo máximo: {tiempo_max} minutos.
+            - Alergias/Exclusiones médicas: {alergias if alergias else 'Ninguna'}
+            - Tiempo máximo de preparación: {tiempo_max} minutos.
+
+            REGLAS ESPECÍFICAS DE INGREDIENTES:
+            - INGREDIENTES OBLIGATORIOS: El usuario desea usar sí o sí estos ingredientes: '{ingredientes_obligatorios if ingredientes_obligatorios else "Ninguno especifico"}'. Asegúrate de que las 3 recetas propuestas los incluyan de forma activa en su preparación.
+            - INGREDIENTES EXCLUIDOS: El usuario NO quiere comer estos ingredientes bajo ningún concepto: '{ingredientes_excluidos if ingredientes_excluidos else "Ninguno"}'. Elimínalos por completo de los pasos y de la lista de ingredientes usados, incluso si estaban presentes en la lista original de la nevera.
 
             Genera exactamente 3 recetas viables y realistas.
             Regla de oro: No inventes ingredientes principales que el usuario no tiene; se permite incluir condimentos básicos (sal, aceite, pimienta) o sugerir de forma muy clara "ingredientes faltantes opcionales" que mejorarían el plato, pero el plato debe poder realizarse con lo que hay.
